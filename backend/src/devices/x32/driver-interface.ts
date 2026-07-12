@@ -16,4 +16,5 @@ export interface X32DriverHandle {
   setMainFader(level01: number): void;
   recallScene(scene: number): void;
   on(event: string | symbol, listener: (...args: unknown[]) => void): EventEmitter;
+  removeAllListeners(event?: string | symbol): EventEmitter;
 }

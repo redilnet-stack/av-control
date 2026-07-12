@@ -3,57 +3,37 @@ import cors from 'cors';
 import { createServer } from 'node:http';
 import { config } from './config/index.js';
 import { logger } from './logger.js';
-import { initWebSocket, broadcastDeviceEvent } from './api/websocket.js';
+import { initWebSocket } from './api/websocket.js';
 import { createApiRouter } from './api/routes/index.js';
-import { createX32Driver } from './devices/x32/index.js';
-import type { X32DriverHandle } from './devices/x32/driver-interface.js';
+import { SettingsStore } from './config/settings-store.js';
+import { DeviceManager } from './devices/manager/device-manager.js';
 
 async function main(): Promise<void> {
-  logger.info(`Jersey Systems AV Control starting...`, {
+  logger.info('Jersey Systems AV Control starting...', {
     env: config.env,
     mockDevices: config.mockDevices,
   });
 
-  // ── Initialise devices ──────────────────────────────────────────────
+  const settings = new SettingsStore();
+  const appSettings = await settings.load();
 
-  const x32: X32DriverHandle = createX32Driver();
+  const deviceManager = new DeviceManager();
+  await deviceManager.applySettings(appSettings);
 
-  try {
-    await x32.connect();
-  } catch (err) {
-    logger.error('X32 connection failed', {
-      error: (err as Error).message,
-    });
-  }
-
-  // ── Hook X32 events → WebSocket broadcasts ──────────────────────────
-
-  x32.on('meter', (data: unknown) => {
-    broadcastDeviceEvent('x32', 'meter', data);
+  settings.on('change', async (newSettings) => {
+    await deviceManager.applySettings(newSettings);
   });
-  x32.on('channelMute', (channel: unknown, muted: unknown) => {
-    broadcastDeviceEvent('x32', 'channelMute', { channel, muted });
-  });
-  x32.on('channelFader', (channel: unknown, level: unknown) => {
-    broadcastDeviceEvent('x32', 'channelFader', { channel, level });
-  });
-  x32.on('connected', () => {
-    broadcastDeviceEvent('x32', 'connected', {});
-  });
-  x32.on('disconnected', () => {
-    broadcastDeviceEvent('x32', 'disconnected', {});
-  });
-
-  // ── Express + HTTP + WebSocket ──────────────────────────────────────
 
   const app = express();
   app.use(cors());
   app.use(express.json());
 
-  // API routes
-  app.use('/api', createApiRouter(x32));
+  app.use('/api', createApiRouter(
+    deviceManager.getX32(),
+    settings,
+    deviceManager,
+  ));
 
-  // Serve frontend in production
   if (config.env === 'production') {
     app.use(express.static('../frontend/dist'));
   }
@@ -61,14 +41,13 @@ async function main(): Promise<void> {
   const httpServer = createServer(app);
   initWebSocket(httpServer);
 
-  // ── Start ───────────────────────────────────────────────────────────
-
   httpServer.listen(config.port, config.host, () => {
-    logger.info(`Server listening on ${config.host}:${config.port}`);
-    logger.info(`API: http://localhost:${config.port}/api`);
-    logger.info(`Health: http://localhost:${config.port}/api/health`);
-    if (config.mockDevices) {
-      logger.info('⚠️  Running with MOCK devices — no real hardware required');
+    logger.info('Server listening on ' + config.host + ':' + config.port);
+    logger.info('API: http://localhost:' + config.port + '/api');
+    logger.info('Settings: http://localhost:' + config.port + '/api/settings');
+    logger.info('Health: http://localhost:' + config.port + '/api/health');
+    if (appSettings.mockDevices) {
+      logger.info('Running with MOCK devices - no real hardware required');
     }
   });
 }
