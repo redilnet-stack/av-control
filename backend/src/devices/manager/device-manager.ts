@@ -2,7 +2,8 @@ import { EventEmitter } from 'node:events';
 import { logger } from '../../logger.js';
 import type { AppSettings } from '../../config/settings-schema.js';
 import type { X32DriverHandle } from '../x32/driver-interface.js';
-import { createX32Driver } from '../x32/index.js';
+import { createX32Driver, X32Driver } from '../x32/index.js';
+import { MockX32Driver } from '../x32/mock.js';
 import { broadcastDeviceEvent } from '../../api/websocket.js';
 
 /**
@@ -23,7 +24,7 @@ export class DeviceManager extends EventEmitter {
     if (settings.mockDevices) {
       logger.info('Mock mode enabled — connecting simulated devices');
       await this.disconnectAll();
-      this.x32 = createX32Driver();
+      this.x32 = new MockX32Driver();
       await this.x32.connect();
       this.hookX32Events();
       return;
@@ -94,10 +95,11 @@ export class DeviceManager extends EventEmitter {
     }
 
     try {
-      const driver = createX32Driver();
+      const driver = new X32Driver({ host: cfg.host, port: cfg.port });
       this.x32 = driver;
       await driver.connect();
       this.hookX32Events();
+      logger.info('X32 reconnected', { host: cfg.host, port: cfg.port });
     } catch (err) {
       logger.error('Failed to connect X32', {
         host: cfg.host,
