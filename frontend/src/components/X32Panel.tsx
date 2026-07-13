@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import type { Socket } from 'socket.io-client';
 
 interface MeterData {
@@ -14,6 +14,20 @@ export function X32Panel({
 }) {
   const [meters, setMeters] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0]);
   const [x32Connected, setX32Connected] = useState(false);
+
+  const fetchInitialState = useCallback(async () => {
+    try {
+      const res = await fetch('/api/health');
+      const data = await res.json();
+      setX32Connected(data.devices?.x32?.connected ?? false);
+    } catch {
+      /* backend not reachable */
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchInitialState();
+  }, [fetchInitialState, connected]);
 
   useEffect(() => {
     const s = socket.current;
@@ -43,7 +57,7 @@ export function X32Panel({
     return () => {
       s.off('deviceEvent', onEvent);
     };
-  }, [socket]);
+  }, [socket, connected]);
 
   async function setChannelMute(ch: number, mute: boolean) {
     await fetch(`/api/x32/channels/${ch}/mute`, {
