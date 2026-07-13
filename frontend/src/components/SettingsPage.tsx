@@ -181,11 +181,8 @@ export function SettingsPage({ onNavigate }: { onNavigate: () => void }) {
       });
   }, []);
 
-  async function handleSave(e: FormEvent) {
-    e.preventDefault();
+  async function saveSettings(): Promise<boolean> {
     setSaving(true);
-    setMessage(null);
-
     try {
       const res = await fetch('/api/settings', {
         method: 'PUT',
@@ -195,14 +192,22 @@ export function SettingsPage({ onNavigate }: { onNavigate: () => void }) {
       const data = await res.json();
       if (res.ok) {
         setMessage({ ok: true, text: 'Settings saved successfully' });
+        return true;
       } else {
         setMessage({ ok: false, text: data.error || 'Save failed' });
+        return false;
       }
     } catch {
       setMessage({ ok: false, text: 'Network error — could not reach backend' });
+      return false;
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleSave(e: FormEvent) {
+    e.preventDefault();
+    await saveSettings();
   }
 
   async function testX32() {
@@ -219,7 +224,12 @@ export function SettingsPage({ onNavigate }: { onNavigate: () => void }) {
         }),
       });
       const data = await res.json();
-      setMessage({ ok: data.ok, text: data.message });
+      if (data.ok) {
+        setMessage({ ok: true, text: 'Connection OK — saving settings...' });
+        await saveSettings();
+      } else {
+        setMessage({ ok: false, text: data.message });
+      }
     } catch {
       setMessage({ ok: false, text: 'Test request failed' });
     } finally {

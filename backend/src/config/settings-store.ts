@@ -95,9 +95,9 @@ export class SettingsStore extends EventEmitter {
     }
   }
 
-  /** Override settings from environment variables. */
+  /** Fill empty settings from environment variables (do not override saved values). */
   private applyEnvOverrides(): void {
-    if (config.x32.X32_HOST) {
+    if (config.x32.X32_HOST && !this.current.devices.x32.host) {
       this.current.devices.x32.host = config.x32.X32_HOST;
     }
     if (config.mockDevices) {
