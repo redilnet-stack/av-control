@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { Settings } from '../types.js';
+import { UsersSection } from './UsersSection.js';
 
 let _tvIdCounter = 0;
 function generateTvId(): string {
@@ -929,6 +930,8 @@ export function SettingsPage({ onNavigate }: { onNavigate: () => void }) {
           </button>
         </div>
       </form>
+
+      <UsersSection />
     </div>
   );
 }
