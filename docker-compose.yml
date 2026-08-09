@@ -9,8 +9,10 @@ services:
       - '3000:3000'
     env_file:
       - ./backend/.env
+    environment:
+      - SETTINGS_PATH=/data/settings.json
     volumes:
-      - ./backend/data:/app/data
+      - jersey-settings:/data
     restart: unless-stopped
     network_mode: host
 
@@ -21,3 +23,6 @@ services:
   #   environment:
   #     - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
   #   restart: unless-stopped
+
+volumes:
+  jersey-settings:

@@ -7,3 +7,15 @@ dist/
 .idea/
 backend/data/
 logs/
+
+# Secrets — contains live Zoom credentials, never commit
+S2S App.md
+zoom.png
+
+# Build/debug artifacts
+*.tsbuildinfo
+frontend/vite.err
+frontend/test-umd-load.js
+
+# Local settings (Windows %APPDATA%, Linux ~/.config)
+settings.json
