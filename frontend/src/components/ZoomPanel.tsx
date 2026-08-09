@@ -14,7 +14,7 @@ const REACTDOM_SCRIPT      = '/zoom/sdk/react-dom.production.min.js';
 const EMBEDDED_SDK_SCRIPT  = '/zoom/zoomus-websdk-embedded.umd.min.js';
 
 /** Asset path for Zoom WASM/AV files (served from Zoom CDN). */
-const ZOOM_ASSET_PATH = 'https://source.zoom.us/2.7.0/lib/av';
+const ZOOM_ASSET_PATH = 'https://source.zoom.us/6.2.0/lib/av';
 
 function loadScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
