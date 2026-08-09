@@ -25,11 +25,13 @@ export function createProjectorRouter(
 ): Router {
   const router = Router();
 
-  /** Responds with 503 if no Broadlink is available. */
+  /** Responds with 503 if no Broadlink is available. Returns null when the
+   * response has already been sent (missing or disconnected). */
   function requireBroadlink(res: Response): BroadlinkHandle | null {
     const b = getBroadlink();
     if (!b || !b.connected) {
       res.status(503).json({ error: 'Broadlink not connected or disabled' });
+      return null;
     }
     return b;
   }
