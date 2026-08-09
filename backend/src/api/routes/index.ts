@@ -1,24 +1,38 @@
 import { Router } from 'express';
 import type { X32DriverHandle } from '../../devices/x32/driver-interface.js';
+import type { AtemDriverHandle } from '../../devices/atem/driver-interface.js';
+import type { VideohubDriverHandle } from '../../devices/videohub/driver-interface.js';
+import type { BroadlinkService } from '../../devices/broadlink/broadlink-service.js';
+import type { MockBroadlinkService } from '../../devices/broadlink/mock.js';
 import type { SettingsStore } from '../../config/settings-store.js';
 import type { DeviceManager } from '../../devices/manager/device-manager.js';
 import { createX32Router } from './x32.js';
+import { createAtemRouter } from './atem.js';
+import { createVideohubRouter } from './videohub.js';
 import { createSettingsRouter } from './settings/index.js';
+import { createProjectorRouter } from './projector.js';
+import { createZoomRouter } from './zoom.js';
+import { createOutletRouter } from './outlets.js';
 
 export function createApiRouter(
-  x32Driver: X32DriverHandle | null,
+  getX32Driver: () => X32DriverHandle | null,
   settingsStore: SettingsStore,
   deviceManager: DeviceManager,
 ): Router {
   const api = Router();
 
-  if (x32Driver) {
-    api.use('/x32', createX32Router(x32Driver));
-  } else {
-    api.use('/x32', (_req, res) => {
-      res.status(503).json({ error: 'X32 not configured or disabled' });
-    });
-  }
+  api.use('/x32', createX32Router(getX32Driver));
+  api.use('/atem', createAtemRouter(() => deviceManager.getAtem()));
+  api.use('/videohub', createVideohubRouter(() => deviceManager.getVideohub()));
+
+  api.use('/projector', createProjectorRouter(
+    () => deviceManager.getBroadlink() as (BroadlinkService | MockBroadlinkService | null),
+    settingsStore,
+  ));
+
+  api.use('/zoom', createZoomRouter(settingsStore));
+
+  api.use('/outlets', createOutletRouter(settingsStore));
 
   api.use('/settings', createSettingsRouter(settingsStore, deviceManager));
 

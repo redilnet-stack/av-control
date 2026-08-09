@@ -12,7 +12,7 @@ export interface X32ChannelAddress {
 /** Fader level in dB (floating-point). -∞ to +10. */
 export const FaderLevelSchema = z.number().min(-145).max(10);
 
-/** Mute state. 0 = unmuted (audio passing), 1 = muted. */
+/** Mute state. 0 = OFF (muted), 1 = ON (audio passing). */
 export const MuteStateSchema = z.number().min(0).max(1);
 
 /** Meters returned from /meters/{n} */
@@ -58,6 +58,10 @@ export const OSC_PATTERNS = {
   channelOn: (ch: number) => `/ch/${String(ch).padStart(2, '0')}/mix/on`,
   channelFader: (ch: number) => `/ch/${String(ch).padStart(2, '0')}/mix/fader`,
   channelName: (ch: number) => `/ch/${String(ch).padStart(2, '0')}/config/name`,
+  auxInOn: (n: number) => `/auxin/${String(n).padStart(2, '0')}/mix/on`,
+  auxInFader: (n: number) => `/auxin/${String(n).padStart(2, '0')}/mix/fader`,
+  fxRtnOn: (n: number) => `/fxrtn/${String(n).padStart(2, '0')}/mix/on`,
+  fxRtnFader: (n: number) => `/fxrtn/${String(n).padStart(2, '0')}/mix/fader`,
   dcaOn: (dca: number) => `/dca/${dca}/on`,
   dcaFader: (dca: number) => `/dca/${dca}/fader`,
   mainOn: '/main/st/mix/on',

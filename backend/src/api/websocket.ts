@@ -4,10 +4,14 @@ import { logger } from '../logger.js';
 
 let io: SocketIOServer | null = null;
 
+type RefreshCallback = () => void;
+
 /**
  * Initialise the WebSocket server on top of the HTTP server.
+ * `onClientConnect` is called every time a new WebSocket client connects,
+ * allowing the server to push current device state to late-joining clients.
  */
-export function initWebSocket(httpServer: HttpServer): SocketIOServer {
+export function initWebSocket(httpServer: HttpServer, onClientConnect?: RefreshCallback): SocketIOServer {
   io = new SocketIOServer(httpServer, {
     cors: {
       origin: '*', // Restrict in production
@@ -19,6 +23,9 @@ export function initWebSocket(httpServer: HttpServer): SocketIOServer {
 
   io.on('connection', (socket) => {
     logger.info(`WebSocket client connected: ${socket.id}`);
+
+    // Push current device state so the newly-connected client has it
+    onClientConnect?.();
 
     socket.on('disconnect', (reason) => {
       logger.info(`WebSocket client disconnected: ${socket.id} (${reason})`);

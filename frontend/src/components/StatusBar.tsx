@@ -15,6 +15,12 @@ export function StatusBar() {
 
       <div className="flex items-center gap-3">
         <Link
+          to="/zoom"
+          className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+        >
+          Zoom
+        </Link>
+        <Link
           to="/settings"
           className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
         >
