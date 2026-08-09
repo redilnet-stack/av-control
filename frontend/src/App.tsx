@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useSocket } from './hooks/useSocket.js';
 import { StatusBar } from './components/StatusBar.js';
 import { X32Panel } from './components/X32Panel.js';
@@ -8,6 +8,9 @@ import { ProjectorPanel } from './components/ProjectorPanel.js';
 import { TvOutletsPanel } from './components/TvOutletsPanel.js';
 import { ZoomPanel } from './components/ZoomPanel.js';
 import { SettingsPage } from './components/SettingsPage.js';
+import { LoginPage } from './pages/LoginPage.js';
+import { SetupPage } from './pages/SetupPage.js';
+import { AuthProvider, useAuth } from './auth/AuthContext.js';
 
 function Dashboard() {
   const { socket, connected } = useSocket();
@@ -38,23 +41,73 @@ function SettingsWrapper() {
   return <SettingsPage onNavigate={() => navigate('/')} />;
 }
 
-export default function App() {
-  return (
-    <BrowserRouter>
+function AppContent() {
+  const { loading, setupRequired, user } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col">
+        <StatusBar />
+        <main className="flex-1 flex items-center justify-center text-zinc-500 text-sm">
+          Loading...
+        </main>
+      </div>
+    );
+  }
+
+  if (setupRequired) {
+    return (
       <div className="min-h-screen bg-zinc-950 flex flex-col">
         <StatusBar />
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/settings" element={<SettingsWrapper />} />
-          <Route path="/zoom" element={
+          <Route path="*" element={<SetupPage />} />
+        </Routes>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col">
+        <StatusBar />
+        <Routes>
+          <Route path="*" element={<LoginPage />} />
+        </Routes>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-950 flex flex-col">
+      <StatusBar />
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route
+          path="/settings"
+          element={user.role === 'admin' ? <SettingsWrapper /> : <Navigate to="/" replace />}
+        />
+        <Route
+          path="/zoom"
+          element={
             <main className="flex-1 p-4 lg:p-6">
               <div className="max-w-2xl mx-auto">
                 <ZoomPanel />
               </div>
             </main>
-          } />
-        </Routes>
-      </div>
-    </BrowserRouter>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <AppContent />
+      </BrowserRouter>
+    </AuthProvider>
   );
 }

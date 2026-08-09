@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.DEV
-  ? 'http://localhost:3000'
-  : undefined;
+// Same-origin always: vite proxies /socket.io in dev, the backend serves the
+// SPA in production. This keeps the session cookie on the handshake.
+const SOCKET_URL = undefined;
 
 export interface DeviceEvent {
   device: string;
