@@ -1,5 +1,33 @@
 import { z } from 'zod';
 
+/** Roles supported by the local login system. */
+export const ROLES = ['admin', 'operator'] as const;
+export type Role = (typeof ROLES)[number];
+
+/** A stored local account. `salt`/`hash` are scrypt credentials. */
+export const UserSchema = z.object({
+  id: z.string(),
+  username: z.string().min(1).max(64),
+  salt: z.string(),
+  hash: z.string(),
+  role: z.enum(ROLES),
+  createdAt: z.string(),
+});
+
+export type StoredUser = z.infer<typeof UserSchema>;
+
+/** User shape safe to return to the frontend (no salt/hash). */
+export type PublicUser = {
+  id: string;
+  username: string;
+  role: Role;
+  createdAt: string;
+};
+
+export function toPublicUser(u: StoredUser): PublicUser {
+  return { id: u.id, username: u.username, role: u.role, createdAt: u.createdAt };
+}
+
 /** Schema for the entire app settings persisted on disk. */
 export const AppSettingsSchema = z.object({
   mockDevices: z.boolean().default(false),
@@ -87,6 +115,9 @@ export const AppSettingsSchema = z.object({
     amp: z.string().default('NU4-6000 Amp'),
     zoom: z.string().default('Zoom'),
   }),
+
+  /** Local login accounts — never exposed to the frontend. */
+  users: z.array(UserSchema).default([]),
 });
 
 export type AppSettings = z.infer<typeof AppSettingsSchema>;
@@ -146,6 +177,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     amp: 'NU4-6000 Amp',
     zoom: 'Zoom',
   },
+  users: [],
 };
 
 /** The settings shape as exposed to the frontend (flattened for ease-of-use). */
@@ -221,8 +253,9 @@ export function toFrontend(s: AppSettings): SettingsFrontend {
   };
 }
 
-/** Convert flat frontend shape back to nested AppSettings. */
-export function fromFrontend(f: SettingsFrontend): AppSettings {
+/** Convert flat frontend shape back to nested AppSettings. Users are never
+ * sent from the frontend — the store preserves existing accounts on update. */
+export function fromFrontend(f: SettingsFrontend): Omit<AppSettings, 'users'> {
   return {
     mockDevices: f.mockDevices,
     zoom: f.zoom,
