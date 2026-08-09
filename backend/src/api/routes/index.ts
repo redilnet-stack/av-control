@@ -6,6 +6,8 @@ import type { BroadlinkService } from '../../devices/broadlink/broadlink-service
 import type { MockBroadlinkService } from '../../devices/broadlink/mock.js';
 import type { SettingsStore } from '../../config/settings-store.js';
 import type { DeviceManager } from '../../devices/manager/device-manager.js';
+import { createAuthRouter } from './auth.js';
+import { createAuthMiddleware } from '../auth/middleware.js';
 import { createX32Router } from './x32.js';
 import { createAtemRouter } from './atem.js';
 import { createVideohubRouter } from './videohub.js';
@@ -14,12 +16,17 @@ import { createProjectorRouter } from './projector.js';
 import { createZoomRouter } from './zoom.js';
 import { createOutletRouter } from './outlets.js';
 
-export function createApiRouter(
+export async function createApiRouter(
   getX32Driver: () => X32DriverHandle | null,
   settingsStore: SettingsStore,
   deviceManager: DeviceManager,
-): Router {
+): Promise<Router> {
   const api = Router();
+  const { requireAuth, requireAdmin } = await createAuthMiddleware(settingsStore);
+
+  // Auth routes must stay public; everything else requires a session.
+  api.use('/auth', await createAuthRouter(settingsStore));
+  api.use(requireAuth);
 
   api.use('/x32', createX32Router(getX32Driver));
   api.use('/atem', createAtemRouter(() => deviceManager.getAtem()));
@@ -34,7 +41,8 @@ export function createApiRouter(
 
   api.use('/outlets', createOutletRouter(settingsStore));
 
-  api.use('/settings', createSettingsRouter(settingsStore, deviceManager));
+  // Settings are admin-only (device config + credentials live there).
+  api.use('/settings', requireAdmin, createSettingsRouter(settingsStore, deviceManager));
 
   api.get('/health', (_req, res) => {
     res.json({

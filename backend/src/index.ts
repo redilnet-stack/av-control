@@ -7,6 +7,7 @@ import { config } from './config/index.js';
 import { logger } from './logger.js';
 import { initWebSocket } from './api/websocket.js';
 import { createApiRouter } from './api/routes/index.js';
+import { createAuthMiddleware } from './api/auth/middleware.js';
 import { SettingsStore } from './config/settings-store.js';
 import { DeviceManager } from './devices/manager/device-manager.js';
 
@@ -28,11 +29,13 @@ async function main(): Promise<void> {
     await deviceManager.applySettings(newSettings);
   });
 
+  const { resolveUserFromToken } = await createAuthMiddleware(settings);
+
   const app = express();
   app.use(cors());
   app.use(express.json());
 
-  app.use('/api', createApiRouter(
+  app.use('/api', await createApiRouter(
     () => deviceManager.getX32(),
     settings,
     deviceManager,
@@ -58,7 +61,7 @@ async function main(): Promise<void> {
     deviceManager.getX32()?.refreshState();
     deviceManager.getAtem()?.refreshState();
     deviceManager.getVideohub()?.refreshState();
-  });
+  }, (token) => resolveUserFromToken(token));
 
   httpServer.listen(config.port, config.host, () => {
     logger.info('Server listening on ' + config.host + ':' + config.port);
