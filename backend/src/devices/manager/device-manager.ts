@@ -392,7 +392,22 @@ export class DeviceManager extends EventEmitter {
 
   // ── Broadlink ────────────────────────────────────────────────────────
 
-  private async reconnectBroadlink(settings: AppSettings): Promise<void> {
+  private broadlinkReconnectChain: Promise<void> = Promise.resolve();
+
+  /**
+   * (Re)connect the Broadlink service from the given settings. Public so
+   * routers can force a reconnect on demand — e.g. a lazy retry after a
+   * failed startup connect. Attempts are serialized; the most recent
+   * settings always apply last.
+   */
+  reconnectBroadlink(settings: AppSettings): Promise<void> {
+    const attempt = (): Promise<void> => this.doReconnectBroadlink(settings);
+    const next = this.broadlinkReconnectChain.then(attempt, attempt);
+    this.broadlinkReconnectChain = next.catch(() => {});
+    return next;
+  }
+
+  private async doReconnectBroadlink(settings: AppSettings): Promise<void> {
     const cfg = settings.devices.broadlink;
 
     if (this.broadlink) {

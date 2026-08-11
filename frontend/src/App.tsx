@@ -7,6 +7,7 @@ import { VideohubPanel } from './components/VideohubPanel.js';
 import { ProjectorPanel } from './components/ProjectorPanel.js';
 import { TvOutletsPanel } from './components/TvOutletsPanel.js';
 import { ZoomPanel } from './components/ZoomPanel.js';
+import { ZoomHostConsole } from './components/ZoomHostConsole.js';
 import { SettingsPage } from './components/SettingsPage.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { SetupPage } from './pages/SetupPage.js';
@@ -92,6 +93,16 @@ function AppContent() {
             <main className="flex-1 p-4 lg:p-6">
               <div className="max-w-2xl mx-auto">
                 <ZoomPanel />
+              </div>
+            </main>
+          }
+        />
+        <Route
+          path="/zoom/host"
+          element={
+            <main className="flex-1 p-4 lg:p-6">
+              <div className="max-w-2xl mx-auto">
+                <ZoomHostConsole />
               </div>
             </main>
           }

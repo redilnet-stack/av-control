@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { logger } from '../../logger.js';
 import type { SettingsStore } from '../../config/settings-store.js';
-import { ZoomService } from '../../services/zoom.js';
+import { ZoomService, type ZoomMeeting } from '../../services/zoom.js';
 
 /** Mask sensitive credential values for frontend display. */
 function mask(str: string): string {
@@ -18,6 +18,12 @@ export function createZoomRouter(
   // ── Lazy ZoomService singleton ──────────────────────────────────
 
   let zoomService: ZoomService | null = null;
+
+  // The most recently created meeting. The venue-host console polls
+  // GET /meetings/current and auto-joins it with the Web SDK, so the
+  // host (and its camera) lives on the venue machine, not the remote
+  // controller's browser.
+  let currentMeeting: { meeting: ZoomMeeting; createdAt: number } | null = null;
 
   function getZoomService(): { service: ZoomService; configured: boolean } {
     const s = settingsStore.get();
@@ -104,12 +110,23 @@ export function createZoomRouter(
       const meeting = await service.createMeeting(parsed.data.topic, {
         muteUponEntry: parsed.data.muteUponEntry,
       });
+      currentMeeting = { meeting, createdAt: Date.now() };
       logger.info(`Zoom meeting created: ${meeting.id} — "${meeting.topic}"`);
       res.json(meeting);
     } catch (err) {
       logger.error('Failed to create Zoom meeting', { error: (err as Error).message });
       res.status(500).json({ error: `Failed to create meeting: ${(err as Error).message}` });
     }
+  });
+
+  // ── GET /meetings/current — latest meeting for the venue host console ─
+
+  router.get('/meetings/current', (_req: Request, res: Response) => {
+    if (!currentMeeting) {
+      res.json({ meeting: null });
+      return;
+    }
+    res.json({ meeting: currentMeeting.meeting });
   });
 
   // ── GET /meetings/:id — get meeting details ─────────────────────
@@ -153,12 +170,25 @@ export function createZoomRouter(
 
     try {
       await service.endMeeting(meetingId);
+      if (currentMeeting?.meeting.id === meetingId) {
+        currentMeeting = null;
+      }
       logger.info(`Zoom meeting ended: ${meetingId}`);
       res.json({ ok: true });
     } catch (err) {
       logger.error('Failed to end meeting', { meetingId, error: (err as Error).message });
       res.status(500).json({ error: `Failed to end meeting: ${(err as Error).message}` });
     }
+  });
+
+  // ── POST /meetings/current/release — host console signals it took over ─
+
+  router.post('/meetings/current/release', async (req: Request, res: Response) => {
+    const meetingId = parseInt(String(req.body?.meetingId), 10);
+    if (!isNaN(meetingId) && currentMeeting?.meeting.id === meetingId) {
+      currentMeeting = null;
+    }
+    res.json({ ok: true });
   });
 
   // ── POST /meetings/:id/mute-all — mute all participants ─────────

@@ -22,18 +22,35 @@ type ScreenCommand = (typeof SCREEN_COMMANDS)[number];
 export function createProjectorRouter(
   getBroadlink: () => BroadlinkHandle | null,
   settings: SettingsStore,
+  reconnectBroadlink: () => Promise<void>,
 ): Router {
   const router = Router();
 
   /** Responds with 503 if no Broadlink is available. Returns null when the
-   * response has already been sent (missing or disconnected). */
-  function requireBroadlink(res: Response): BroadlinkHandle | null {
-    const b = getBroadlink();
-    if (!b || !b.connected) {
-      res.status(503).json({ error: 'Broadlink not connected or disabled' });
+   * response has already been sent (missing or disconnected). Tries one
+   * lazy reconnect first — the startup connect can fail transiently and
+   * nothing else retries it. */
+  async function requireBroadlink(res: Response): Promise<BroadlinkHandle | null> {
+    let b = getBroadlink();
+    if (b?.connected) return b;
+
+    if (!settings.get().devices.broadlink.enabled) {
+      res.status(503).json({ error: 'Broadlink disabled in settings' });
       return null;
     }
-    return b;
+
+    try {
+      await reconnectBroadlink();
+      b = getBroadlink();
+      if (b?.connected) return b;
+    } catch {
+      // fall through to the error response below
+    }
+
+    res.status(503).json({
+      error: 'Broadlink not connected — check that the device is powered on and reachable',
+    });
+    return null;
   }
 
   // ── Status ──────────────────────────────────────────────────────────
@@ -63,7 +80,7 @@ export function createProjectorRouter(
   });
 
   router.post('/projector', async (req: Request, res: Response) => {
-    const b = requireBroadlink(res);
+    const b = await requireBroadlink(res);
     if (!b) return;
 
     const parsed = projectorBodySchema.safeParse(req.body);
@@ -113,7 +130,7 @@ export function createProjectorRouter(
   });
 
   router.post('/screen', async (req: Request, res: Response) => {
-    const b = requireBroadlink(res);
+    const b = await requireBroadlink(res);
     if (!b) return;
 
     const parsed = screenBodySchema.safeParse(req.body);
@@ -176,7 +193,7 @@ export function createProjectorRouter(
   });
 
   router.post('/learn', async (req: Request, res: Response) => {
-    const b = requireBroadlink(res);
+    const b = await requireBroadlink(res);
     if (!b) return;
 
     const parsed = learnBodySchema.safeParse(req.body);

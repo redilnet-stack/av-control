@@ -35,6 +35,7 @@ export async function createApiRouter(
   api.use('/projector', createProjectorRouter(
     () => deviceManager.getBroadlink() as (BroadlinkService | MockBroadlinkService | null),
     settingsStore,
+    () => deviceManager.reconnectBroadlink(settingsStore.get()),
   ));
 
   api.use('/zoom', createZoomRouter(settingsStore));

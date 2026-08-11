@@ -188,6 +188,10 @@ export function createSettingsRouter(
         const svc = new BroadlinkService();
         await svc.connect(host);
         await svc.disconnect();
+        // Promote the tested connection into the live service so the app
+        // can use it immediately — otherwise the manager keeps its failed
+        // (null) handle and saving settings does not retry.
+        await deviceManager.reconnectBroadlink(settings.get());
         res.json({ ok: true, message: `Connected to Broadlink at ${host}` });
       } catch (err) {
         res.json({

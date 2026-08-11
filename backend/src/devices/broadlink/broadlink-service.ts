@@ -7,22 +7,43 @@ import { logger } from '../../logger.js';
 import type { BroadlinkState } from './types.js';
 
 /**
- * Pick the first non-internal IPv4 address from the local machine.
+ * Pick the local IPv4 address that can reach the target.
  * The Broadlink discovery packet needs the actual interface IP, but
  * `socket.address().address` returns '0.0.0.0' for a wildcard-bound UDP
  * socket — so we resolve it independently before binding.
+ *
+ * Prefers an interface whose subnet contains the target (multi-NIC / VPN
+ * machines can't just use the first adapter), falling back to the first
+ * non-internal IPv4 address.
  */
-function getLocalIpForTarget(_target: string): string | null {
+function getLocalIpForTarget(target: string): string | null {
+  const targetParts = target.split('.').map(Number);
+  if (targetParts.length !== 4) return null;
+
   const ifaces = networkInterfaces();
+  let fallback: string | null = null;
+
   for (const addrs of Object.values(ifaces)) {
     if (!addrs) continue;
     for (const addr of addrs) {
-      if (addr.family === 'IPv4' && !addr.internal) {
-        return addr.address;
+      if (addr.family !== 'IPv4' || addr.internal) continue;
+      fallback ??= addr.address;
+
+      // Does the target fall inside this interface's subnet?
+      const mask = addr.netmask.split('.').map(Number);
+      const localParts = addr.address.split('.').map(Number);
+      if (mask.length !== 4 || localParts.length !== 4) continue;
+      let inSubnet = true;
+      for (let i = 0; i < 4; i++) {
+        if ((localParts[i] & mask[i]) !== (targetParts[i] & mask[i])) {
+          inSubnet = false;
+          break;
+        }
       }
+      if (inSubnet) return addr.address;
     }
   }
-  return null;
+  return fallback;
 }
 
 /** Parse a Broadlink discovery response into device info. */
@@ -187,21 +208,24 @@ export class BroadlinkService extends EventEmitter {
   private async connectByHost(host: string): Promise<void> {
     logger.info('Connecting to Broadlink at', { host });
 
-    // Strategy 1: standard discovery with generous timeout
+    // Strategy 1: direct unicast UDP probe to the specific IP.
+    // Broadcast discovery cannot cross subnets, so it would only add
+    // latency when a host is explicitly configured.
+    const directDevice = await this.probeDevice(host);
+    if (directDevice) {
+      await this.initDevice(directDevice);
+      logger.info('Broadlink connected via direct probe', { model: this._model, host: this._host });
+      return;
+    }
+
+    // Strategy 2: standard discovery with generous timeout
+    // (catches same-subnet devices that ignore unicast probes).
+    logger.info('Direct probe failed — trying discovery', { host });
     const devices = await discover(5_000);
     const found = devices.find((d) => d.host.address === host);
     if (found) {
       await this.initDevice(found);
       logger.info('Broadlink connected via discovery', { model: this._model, host: this._host });
-      return;
-    }
-
-    // Strategy 2: direct UDP probe to the specific IP
-    logger.info('Discovery did not find device — trying direct probe to', { host });
-    const directDevice = await this.probeDevice(host);
-    if (directDevice) {
-      await this.initDevice(directDevice);
-      logger.info('Broadlink connected via direct probe', { model: this._model, host: this._host });
       return;
     }
 
